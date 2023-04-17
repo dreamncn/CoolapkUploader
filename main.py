@@ -1,40 +1,52 @@
-import requests
 import argparse
-import re
 
+import CoolApi
+from Log import *
 
-def login():
-    url = "https://account.coolapk.com/auth/loginByCoolapk"
-    response = requests.get(url)
-    match = re.search(r"requestHash\s*:\s*'(\w+)'", response.text)
-    if match:
-        request_hash = match.group(1)
-        print(f"The request hash is {request_hash}")
-    else:
-        print("Failed to extract the request hash from the response.")
-        exit(255)
+debuggable = False
 
 
 def main():
-    parser = argparse.ArgumentParser(description="A script for publishing the Coolapk application")
-    parser.add_argument("-u", "--username", help="Your Coolapk Username")
-    parser.add_argument("-p", "--password", help="Your Coolapk Password")
-    parser.add_argument("-id", "--apk_id", dest="id", help="Your APK ID")
-    parser.add_argument("-path", "--apk_path", dest="path", help="Your Apk Path")
-    parser.add_argument("-log", "--update_logs", dest="log", help="Your Apk Update Logs")
+    parser = argparse.ArgumentParser(description="A script for publishing the coolapk application")
+    parser.add_argument("-u", "--username", help="your coolapk username")
+    parser.add_argument("-p", "--password", help="your coolapk password")
+    parser.add_argument("-id", "--apk_id", dest="id", help="your apk id")
+    parser.add_argument("-path", "--apk_path", dest="path", help="your apk path")
+    parser.add_argument("-log", "--update_logs", dest="log", help="your apk update logs")
+    parser.add_argument("-app", "--baidu_app", dest="baidu_app", help="baidu app id")
+    parser.add_argument("-bid", "--baidu_id", dest="baidu_id", help="baidu key id")
+    parser.add_argument("-s", "--baidu_secret", dest="baidu_secret", help="baidu secret id")
 
-    args = parser.parse_args()
-
-    if not (args.username and args.password and args.id and args.path and args.log):
+    parser.add_argument("-d", "--debuggable", default=False, dest="debug", help="is debuggable")
+    argv = parser.parse_args()
+    global debuggable
+    debuggable = argv.debug == "True"
+    log("IsDebuggable", argv.debug, WARNING)
+    if not (argv.username and argv.password and argv.id and argv.path and argv.log):
         parser.print_help()
-        exit()
-
-    print("Username: ", args.username)
-    print("Password: ", args.password)
-    print("APK ID: ", args.id)
-    print("APK Path: ", args.path)
-    print("Update Logs: ", args.log)
-    login()
+        exit(255)
+    log("--------------Command Info Start-----------------", None, INFO)
+    log("Username", argv.username, INFO)
+    log("Password", argv.password, INFO)
+    log("APK ID", argv.id, INFO)
+    log("APK Path", argv.path, INFO)
+    log("Update Logs", argv.log, INFO)
+    log("Baidu App Id", argv.baidu_app, INFO)
+    log("Baidu Key Id", argv.baidu_id, INFO)
+    log("Baidu key Secret", argv.baidu_secret, INFO)
+    log("--------------Command Info End-----------------", None, INFO)
+    args = {
+        'username': argv.username,
+        'password': argv.password,
+        'id': argv.id,
+        'path': argv.path,
+        'log': argv.log,
+        'baidu_app': argv.baidu_app,
+        'baidu_id': argv.baidu_id,
+        'baidu_secret': argv.baidu_secret,
+    }
+    CoolApi.login(args)
+  # CoolApi.listApps()
 
 
 if __name__ == '__main__':
