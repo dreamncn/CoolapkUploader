@@ -165,6 +165,7 @@ def login(arg):
     log("Coolapk", "Welcome, " + repos["SESSION"]["username"] + " " + repos["SESSION"]["groupName"] + "!", SUCCESS)
     log("===========================Login Successful===============================", None, SUCCESS)
     listApps()
+    uploaderApp()
 
 
 def is_valid_string(input_str):
@@ -213,6 +214,20 @@ def listApps():
             find = True
     log("======================================================================", None, INFO)
     if not find:
-        log("Coolapk", "Can\'t find the id of "+args.get("id")+"，Please ensure that you had released the app in "
-                                                               "coolapk market!", ERROR)
+        log("Coolapk", "Can\'t find the id of " + args.get("id") + "，Please ensure that you had released the app in "
+                                                                   "coolapk market!", ERROR)
         exit(220)
+
+def uploaderApp():
+    # 上传App
+    pass
+
+
+def saveAppLogs():
+    # 保存app更新日志
+    pass
+
+
+def saveAndPushApp():
+    # 保存并推送app更新
+    pass
