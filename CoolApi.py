@@ -2,6 +2,8 @@ import json
 import os
 import random
 import re
+import string
+
 from bs4 import BeautifulSoup
 import requests
 
@@ -60,6 +62,27 @@ page_headers = {
     'sec-ch-ua-mobile': '?0',
     'sec-ch-ua-platform': '"macOS"'
 }
+uploads_headers = {
+    "Accept": "*/*",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "DNT": "1",
+    "Host": "developer.coolapk.com",
+    "Origin": "https://developer.coolapk.com",
+    "Pragma": "no-cache",
+    "Referer": "https://developer.coolapk.com/do?c=apk&m=edit&id=286892&listType=all&activeTab=2",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-origin",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
+    "content-type": "application/octet-stream",
+    "sec-ch-ua": "\"Google Chrome\";v=\"111\", \"Not(A:Brand\";v=\"8\", \"Chromium\";v=\"111\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"macOS\""
+}
+
 session = requests.session()
 session.headers.update(headers)
 
@@ -84,18 +107,21 @@ def checkUser(request_hash):
 
 
 # 获取初始Cookie
-def getRequestHash():
-    url = "https://account.coolapk.com/auth/loginByCoolapk"
+def getRequestHash(url):
     response = session.get(url)
     updateCookie()
+    return getRequestHashFromText(response.text)
+
+
+def getRequestHashFromText(text):
     pattern = r'data-request-hash="(\w+)"'
-    match = re.search(pattern, response.text)
+    match = re.search(pattern, text)
     if match:
         request_hash = match.group(1)
         log("request_hash", request_hash, SUCCESS)
     else:
         log("request_hash", "Failed to extract the request hash from the response.", ERROR)
-        log("Response From Coolapk Site ", response.text, INFO)
+        log("Response From Coolapk Site ", text, INFO)
         exit(255)
     return request_hash
 
@@ -106,7 +132,7 @@ def updateCookie():
     if cookies:
         log("request_cookie", cookies, SUCCESS)
         session.cookies.update(cookies)
-    cookie_str = "; ".join([str(x) + "=" + str(y) for x, y in cookies.items()])
+        cookie_str = "; ".join([str(x) + "=" + str(y) for x, y in cookies.items()])
 
 
 # 读取验证码，并调用百度验证
@@ -127,7 +153,7 @@ def readCaptcha():
 def login(arg):
     global args, cookie_str
     args = arg
-    request_hash = getRequestHash()
+    request_hash = getRequestHash("https://account.coolapk.com/auth/loginByCoolapk")
     checkUser(request_hash)
     url = 'https://account.coolapk.com/auth/loginByCoolapk'
     captcha_data = readCaptcha()
@@ -165,7 +191,8 @@ def login(arg):
     log("Coolapk", "Welcome, " + repos["SESSION"]["username"] + " " + repos["SESSION"]["groupName"] + "!", SUCCESS)
     log("===========================Login Successful===============================", None, SUCCESS)
     listApps()
-    uploaderApp()
+    # uploaderApp()
+    deleteUnReleaseApp()
 
 
 def is_valid_string(input_str):
@@ -218,9 +245,81 @@ def listApps():
                                                                    "coolapk market!", ERROR)
         exit(220)
 
+
+def generate_random_string(length):
+    """生成指定长度的随机字符串"""
+    letters = string.ascii_lowercase + string.digits
+    return ''.join(random.choice(letters) for i in range(length))
+
+
+def deleteUnReleaseApp():
+    global page_headers
+    # request_hash = getRequestHash("https://account.coolapk.com/auth/loginByCoolapk")
+    params = {
+        "c": "apk",
+        "m": "edit",
+        "id": "268462",
+        "listType": "all",
+        "activeTab": "2"
+    }
+    page_headers['Cookie'] = cookie_str
+    url = "https://developer.coolapk.com/do"
+    response = session.get(url, headers=page_headers, params=params)
+    request_hash = getRequestHashFromText(response.text)
+    print(response.text)
+    matches = re.findall(r'data-(\w+)="(.*?)"', response.text)
+
+    for match in matches:
+        print(match)
+
+
 def uploaderApp():
-    # 上传App
-    pass
+    # 分块上传
+    upload_url = "https://developer.coolapk.com/apk/uploadApkFile"
+    aid = args.get("id")
+    chunk_size = 5242880  # 5 MB
+    path = args.get("path")
+    if not os.path.isfile(path):
+        log("Coolapk", "No such file or directory:  " + path, ERROR)
+        exit(255)
+    log("Coolapk Uploader", "Start to upload file : " + path, INFO)
+    # 生成随机字符串
+    id = "o_" + generate_random_string(30)
+    upload_path = ""
+
+    with open(args.get("path"), 'rb') as f:
+        chunk_num = 0
+        file_size = os.path.getsize(args.get("path"))
+        total_chunks = -(-file_size // chunk_size)  # 计算总块数
+
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            uploads_headers["Cookie"] = cookie_str
+
+            params = {
+                'name': 'test.apk',
+                'chunk': chunk_num,
+                'chunks': total_chunks,
+                'aid': aid,
+                'id': id,
+                'type': 'application/vnd.android.package-archive',
+                'size': file_size
+            }
+            log("Coolapk Uploader", "Process : " + str(chunk_num / total_chunks * 100) + "%", INFO)
+            r = requests.post(upload_url, headers=uploads_headers, params=params, data=chunk)
+            if chunk_num + 1 == total_chunks:
+                log("Coolapk Uploader", "Upload completed !", INFO)
+                rep = json.loads(r.text)
+                if 'result' in rep:
+                    log("Coolapk Uploader", "Upload successful !", SUCCESS)
+                    log("Coolapk Uploader", "File url: " + rep['result'], SUCCESS)
+                else:
+                    log("Coolapk Uploader", "Upload error !" + rep["error"]["message"], ERROR)
+                    log("Coolapk Uploader", "Upload error Raw Data:" + r.text, ERROR)
+                    exit(230)
+            chunk_num += 1
 
 
 def saveAppLogs():
